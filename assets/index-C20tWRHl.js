@@ -146,6 +146,11 @@ function hideskeleton() {
     }, 300);
   });
 }
+const createSkeletonData = Array(20).fill({
+  poster_path: null,
+  title: null,
+  vote_average: null
+});
 class MovieLayout {
   constructor(movieData) {
     __privateAdd(this, _state);
@@ -160,6 +165,16 @@ class MovieLayout {
   setState(newState) {
     __privateSet(this, _state, { ...__privateGet(this, _state), ...newState });
     this.render();
+  }
+  static skeletonRender() {
+    const skeletonTemplate = `
+        <h2 id="movieListTitle" class="text-xl"></h2>
+        <div id="movieListContainer">
+            ${MovieList(createSkeletonData).template().outerHTML}
+        </div>
+    `;
+    const movieSectionEl = document.getElementById("MovieSection");
+    if (movieSectionEl) movieSectionEl.innerHTML = skeletonTemplate;
   }
   template() {
     var _a;
@@ -315,6 +330,7 @@ function Banner(data) {
     `;
 }
 addEventListener("load", async () => {
+  MovieLayout.skeletonRender();
   const movieData = await fetchPopularMovies(1);
   const movieLayout = new MovieLayout(movieData.results);
   const bannerElement = document.getElementById("bannerSection");
