@@ -137,27 +137,6 @@ function Button({ content, eventName, type, width }) {
         <button type="${type}" style=${`width: ${width}`} class="primary" data-action="${eventName}">${content}</button>
     `;
 }
-async function fetchPopularMovies(pageIndex) {
-  const popularMovieUrl = `https://api.themoviedb.org/3/movie/popular?language=ko-Kr&page=${pageIndex}`;
-  return await fetchUtil(popularMovieUrl);
-}
-async function fetchSearchMovies(searchKeyword, pageIndex) {
-  const searchMovieUrl = `https://api.themoviedb.org/3/search/movie?query=${searchKeyword}&include_adult=false&language=en-US&page=${pageIndex}`;
-  return await fetchUtil(searchMovieUrl);
-}
-async function fetchUtil(url) {
-  const options = {
-    headers: {
-      Authorization: `Bearer ${"eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1ZTAxM2I1YmViOGE1MjMxNDM0ZDc0OWJlYjM3YzU2NiIsIm5iZiI6MTc0MjI3MTc4My45NjgsInN1YiI6IjY3ZDhmNTI3ZTFlM2NkY2JmOWM2YTA5ZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Gw36ZrbKKajI3n99z42jbhM_RL4wC6_p9UGhmkLgUew"}`
-    }
-  };
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    alert("서버와의 연결이 끊어졌습니다");
-  }
-  const { results, total_pages } = await response.json();
-  return { results, total_pages };
-}
 function hideskeleton() {
   const skeletonItem = document.querySelectorAll(".skeleton-image");
   skeletonItem.forEach((element) => {
@@ -183,7 +162,8 @@ class MovieLayout {
     this.render();
   }
   template() {
-    if (__privateGet(this, _state).movieData.length === 0) {
+    var _a;
+    if (((_a = __privateGet(this, _state).movieData) == null ? void 0 : _a.length) === 0) {
       return `
             <div class="flex-center gap-16">
                 <img src="./images/hangsung.png" />
@@ -200,15 +180,38 @@ class MovieLayout {
         `;
   }
   render() {
-    document.getElementById("MovieSection").innerHTML = this.template();
+    const movieSectionEl = document.getElementById("MovieSection");
+    if (movieSectionEl) movieSectionEl.innerHTML = this.template();
     hideskeleton();
   }
   newMovieListRender(dataList) {
+    var _a;
     const ul = MovieList(dataList).template();
-    document.getElementById("movieListContainer").appendChild(ul);
+    (_a = document.getElementById("movieListContainer")) == null ? void 0 : _a.appendChild(ul);
   }
 }
 _state = new WeakMap();
+async function fetchPopularMovies(pageIndex) {
+  const popularMovieUrl = `https://api.themoviedb.org/3/movie/popular?language=ko-Kr&page=${pageIndex}`;
+  return await fetchUtil(popularMovieUrl);
+}
+async function fetchSearchMovies(searchKeyword, pageIndex) {
+  const searchMovieUrl = `https://api.themoviedb.org/3/search/movie?query=${searchKeyword}&include_adult=false&language=en-US&page=${pageIndex}`;
+  return await fetchUtil(searchMovieUrl);
+}
+async function fetchUtil(url) {
+  const options = {
+    headers: {
+      Authorization: `Bearer ${"eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1ZTAxM2I1YmViOGE1MjMxNDM0ZDc0OWJlYjM3YzU2NiIsIm5iZiI6MTc0MjI3MTc4My45NjgsInN1YiI6IjY3ZDhmNTI3ZTFlM2NkY2JmOWM2YTA5ZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Gw36ZrbKKajI3n99z42jbhM_RL4wC6_p9UGhmkLgUew"}`
+    }
+  };
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    alert("서버와의 연결이 끊어졌습니다");
+  }
+  const { results, total_pages } = await response.json();
+  return { results, total_pages };
+}
 function removeButton(movieLayout, total_pages, pageIndex) {
   if (total_pages < pageIndex) {
     movieLayout.setState(
@@ -241,9 +244,15 @@ async function clickEvent(movieLayout) {
   const readMoreSearchList = /* @__PURE__ */ function() {
     let pageIndex = 2;
     async function loadMovieData() {
-      const layoutTitleText = document.getElementById("movieListTitle").innerText;
+      var _a;
+      const layoutTitleText = (_a = document.getElementById("movieListTitle")) == null ? void 0 : _a.innerText;
       const regex = /"([^"]*)"/;
-      const searchKeyword = layoutTitleText.match(regex)[1];
+      const match = layoutTitleText == null ? void 0 : layoutTitleText.match(regex);
+      if (!match) {
+        console.error("검색어를 찾을 수 없습니다:", layoutTitleText);
+        return;
+      }
+      const searchKeyword = match[1];
       const { results, total_pages } = await fetchSearchMovies(searchKeyword, pageIndex);
       pageIndex++;
       removeButton(movieLayout, total_pages, pageIndex);
@@ -251,13 +260,13 @@ async function clickEvent(movieLayout) {
     }
     return async function() {
       const movieData = await loadMovieData();
-      movieLayout.newMovieListRender(movieData);
+      if (movieData) movieLayout.newMovieListRender(movieData);
       hideskeleton();
     };
   }();
   async function onClick(event) {
-    const target = event.target.closest("[data-action]");
-    if (!target) return;
+    const target = event.target instanceof Element ? event.target.closest("[data-action]") : null;
+    if (!(target instanceof HTMLElement)) return;
     if (target.dataset.action === "readMoreMovieList") {
       await readMoreMovieList();
     }
@@ -308,7 +317,8 @@ function Banner(data) {
 addEventListener("load", async () => {
   const movieData = await fetchPopularMovies(1);
   const movieLayout = new MovieLayout(movieData.results);
-  document.getElementById("bannerSection").innerHTML = Banner(movieData.results[0]);
+  const bannerElement = document.getElementById("bannerSection");
+  if (bannerElement) bannerElement.innerHTML = Banner(movieData.results[0]);
   await submitEvent(movieLayout);
   clickEvent(movieLayout);
   Header();
