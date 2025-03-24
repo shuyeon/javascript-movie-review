@@ -60,6 +60,8 @@ function SearchForm() {
     </form>
     `;
 }
+const getElement = (selector) => document.querySelector(selector);
+const createElement = (tag) => document.createElement(tag);
 function Header() {
   function template() {
     return `
@@ -74,11 +76,10 @@ function Header() {
     `;
   }
   function render() {
-    document.querySelector("header").innerHTML = template();
+    getElement("header").innerHTML = template();
   }
   render();
 }
-const createElement = (tag) => document.createElement(tag);
 const BASE_IMAGE_URL = "https://image.tmdb.org/t/p/w500";
 function MovieItem({ img, rating, title }) {
   function template() {
@@ -92,7 +93,6 @@ function MovieItem({ img, rating, title }) {
           alt="${title}"
         />
         </div>
-
 
         <div class="item-desc">
         
@@ -140,13 +140,12 @@ function Button({ content, eventName, type, width }) {
 function hideskeleton() {
   const skeletonItem = document.querySelectorAll(".skeleton-image");
   skeletonItem.forEach((element) => {
-    setTimeout(() => {
-      element.style.opacity = "0";
-      element.style.display = "none";
-    }, 300);
+    element.style.opacity = "0";
+    element.style.display = "none";
   });
 }
-const createSkeletonData = Array(20).fill({
+const MOVIE_COUNT_PER_PAGE = 20;
+const createSkeletonData = Array(MOVIE_COUNT_PER_PAGE).fill({
   poster_path: null,
   title: null,
   vote_average: null
@@ -157,12 +156,12 @@ class MovieLayout {
     __privateSet(this, _state, {
       title: "지금 인기 있는 영화",
       eventName: "readMoreMovieList",
-      isPossibleMore: movieData.length === 20,
+      isPossibleMore: movieData.length === MOVIE_COUNT_PER_PAGE,
       movieData
     });
     this.render();
   }
-  setState(newState) {
+  async setState(newState) {
     __privateSet(this, _state, { ...__privateGet(this, _state), ...newState });
     this.render();
   }
@@ -173,7 +172,7 @@ class MovieLayout {
             ${MovieList(createSkeletonData).template().outerHTML}
         </div>
     `;
-    const movieSectionEl = document.getElementById("MovieSection");
+    const movieSectionEl = getElement("#MovieSection");
     if (movieSectionEl) movieSectionEl.innerHTML = skeletonTemplate;
   }
   template() {
@@ -195,23 +194,23 @@ class MovieLayout {
         `;
   }
   render() {
-    const movieSectionEl = document.getElementById("MovieSection");
+    const movieSectionEl = getElement("#MovieSection");
     if (movieSectionEl) movieSectionEl.innerHTML = this.template();
     hideskeleton();
   }
   newMovieListRender(dataList) {
     var _a;
     const ul = MovieList(dataList).template();
-    (_a = document.getElementById("movieListContainer")) == null ? void 0 : _a.appendChild(ul);
+    (_a = getElement("#movieListContainer")) == null ? void 0 : _a.appendChild(ul);
   }
 }
 _state = new WeakMap();
 async function fetchPopularMovies(pageIndex) {
-  const popularMovieUrl = `https://api.themoviedb.org/3/movie/popular?language=ko-Kr&page=${pageIndex}`;
+  const popularMovieUrl = `${"https://api.themoviedb.org/3/"}movie/popular?language=ko-Kr&page=${pageIndex}`;
   return await fetchUtil(popularMovieUrl);
 }
 async function fetchSearchMovies(searchKeyword, pageIndex) {
-  const searchMovieUrl = `https://api.themoviedb.org/3/search/movie?query=${searchKeyword}&include_adult=false&language=en-US&page=${pageIndex}`;
+  const searchMovieUrl = `${"https://api.themoviedb.org/3/"}search/movie?query=${searchKeyword}&include_adult=false&language=en-US&page=${pageIndex}`;
   return await fetchUtil(searchMovieUrl);
 }
 async function fetchUtil(url) {
@@ -241,9 +240,8 @@ async function clickEvent(movieLayout) {
   function reload() {
     location.reload();
   }
-  const readMoreMovieList = function() {
+  const readMoreMovieList = /* @__PURE__ */ function() {
     let pageIndex = 2;
-    setTimeout(hideskeleton, 500);
     async function loadMovieData() {
       const { results, total_pages } = await fetchPopularMovies(pageIndex);
       pageIndex++;
@@ -260,7 +258,7 @@ async function clickEvent(movieLayout) {
     let pageIndex = 2;
     async function loadMovieData() {
       var _a;
-      const layoutTitleText = (_a = document.getElementById("movieListTitle")) == null ? void 0 : _a.innerText;
+      const layoutTitleText = (_a = getElement("#movieListTitle")) == null ? void 0 : _a.innerText;
       const regex = /"([^"]*)"/;
       const match = layoutTitleText == null ? void 0 : layoutTitleText.match(regex);
       if (!match) {
@@ -298,7 +296,7 @@ async function submitEvent(movieLayout) {
     const formData = new FormData(form);
     const searchKeyword = String(formData.get("searchInput"));
     const { results: searchData } = await fetchSearchMovies(searchKeyword, 1);
-    movieLayout.setState({ title: `"${searchKeyword}" 검색 결과`, eventName: "readMoreSearchList", movieData: searchData, isPossibleMore: searchData.length === 20 });
+    movieLayout.setState({ title: `"${searchKeyword}" 검색 결과`, eventName: "readMoreSearchList", movieData: searchData, isPossibleMore: searchData.length === MOVIE_COUNT_PER_PAGE });
   }
   async function onSubmit(event) {
     var _a;
@@ -308,7 +306,7 @@ async function submitEvent(movieLayout) {
     if (form.id === "searchForm") {
       await getSearchData(event, form);
     }
-    (_a = document.getElementById("bannerSection")) == null ? void 0 : _a.setAttribute("style", "display: none");
+    (_a = getElement("#bannerSection")) == null ? void 0 : _a.setAttribute("style", "display: none");
     window.scrollTo({ top: 0, behavior: "smooth" });
     form.reset();
   }
@@ -333,7 +331,7 @@ addEventListener("load", async () => {
   MovieLayout.skeletonRender();
   const movieData = await fetchPopularMovies(1);
   const movieLayout = new MovieLayout(movieData.results);
-  const bannerElement = document.getElementById("bannerSection");
+  const bannerElement = getElement("#bannerSection");
   if (bannerElement) bannerElement.innerHTML = Banner(movieData.results[0]);
   await submitEvent(movieLayout);
   clickEvent(movieLayout);
