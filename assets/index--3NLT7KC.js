@@ -85,12 +85,12 @@ function Header() {
 const MOVIE_COUNT_PER_PAGE = 20;
 const BASE_IMAGE_URL = "https://image.tmdb.org/t/p/w500";
 const RATING_MESSAGES = {
-  "null": { comment: "별점 미등록", rating: "0" },
-  "0": { comment: "최악이에요", rating: "2" },
-  "1": { comment: "별로예요", rating: "4" },
-  "2": { comment: "보통이에요", rating: "6" },
-  "3": { comment: "재밌어요", rating: "8" },
-  "4": { comment: "명작이에요", rating: "10" }
+  "fallback": { comment: "별점 미등록", rating: 0 },
+  "0": { comment: "최악이에요", rating: 2 },
+  "1": { comment: "별로예요", rating: 4 },
+  "2": { comment: "보통이에요", rating: 6 },
+  "3": { comment: "재밌어요", rating: 8 },
+  "4": { comment: "명작이에요", rating: 10 }
 };
 function MovieItem({ img, rating, title }) {
   function template() {
@@ -154,7 +154,7 @@ const createSkeletonData = Array(MOVIE_COUNT_PER_PAGE).fill({
   title: null,
   vote_average: null
 });
-function Modal(id, content) {
+function Modal(id, content, event, title) {
   function createModalBackdrop(id2) {
     const $el = document.querySelector(".modal-background");
     $el.id = id2;
@@ -164,12 +164,17 @@ function Modal(id, content) {
   function createModalContainer(content2) {
     const $el = document.querySelector(".modal");
     $el.innerHTML = content2;
-    $el.addEventListener("click", (event) => {
-      event.stopPropagation();
+    $el.addEventListener("click", (event2) => {
+      event2.stopPropagation();
+    });
+    const $closeButtonEl = document.querySelector(".close-modal");
+    $closeButtonEl.addEventListener("click", (event2) => {
+      Modal.close(id);
     });
   }
   createModalBackdrop(id);
   createModalContainer(content);
+  event(title);
 }
 Modal.open = function(id) {
   const $el = document.getElementById(id);
@@ -207,46 +212,51 @@ function createStorage(key) {
   };
 }
 function MyRating(title) {
-  const ratingData = createStorage(`${title}`);
+  const ratingData = createStorage(title);
   const data = ratingData.get();
-  const rating = data ? data : "null";
+  const rating = data ?? "fallback";
   const stars = Array.from(
     { length: 5 },
     (_, i) => i <= rating ? StarButton(true, i) : StarButton(false, i)
   ).join("");
-  setTimeout(() => {
+  function starEvent() {
     const starEls = document.querySelectorAll(".star-button");
-    starEls.forEach((movieListEl) => {
-      movieListEl.addEventListener("click", async (event) => {
-        ratingData.set(movieListEl.id);
+    starEls.forEach((starEl) => {
+      starEl.addEventListener("click", () => {
+        ratingData.set(starEl.id);
         updateMyRating(title);
       });
     });
-  }, 0);
-  return `
+  }
+  function updateMyRating(title2) {
+    const { myRatingtemplate: myRatingtemplate2, starEvent: starEvent2 } = MyRating(title2);
+    const container = document.querySelector(".my-rating-container");
+    if (container) {
+      container.innerHTML = myRatingtemplate2;
+      starEvent2();
+    }
+  }
+  const myRatingtemplate = `
     <div class="my-rating">
         <div style="display: flex;">
              ${stars}
         </div>
-        <div  style="display: flex; gap: 10px;">
-            <div >${RATING_MESSAGES[rating].comment}</div>
+        <div style="display: flex; gap: 10px;">
+            <div>${RATING_MESSAGES[rating].comment}</div>
             <div class="my-rating-text">${RATING_MESSAGES[rating].rating}/10</div>
         </div>
     </div>
     `;
-}
-function updateMyRating(title) {
-  const myRating = MyRating(title);
-  document.querySelector(".my-rating-container").innerHTML = myRating;
+  return { myRatingtemplate, starEvent };
 }
 function MovieDetail({ poster_path, title, vote_average, release_date, genres, overview }) {
   const imgSrc = poster_path ? `${BASE_IMAGE_URL}${poster_path}` : "./images/nullImage.png";
   const genresName = genres.map((genre) => genre.name).join(", ");
   const year = release_date.split("-")[0];
   const rating = roundRating(vote_average);
-  const myRating = MyRating(title);
+  const { myRatingtemplate, starEvent } = MyRating(title);
   document.querySelectorAll(".star-button");
-  return `
+  const modalDetailtemplate = `
         <button class="close-modal">
           <img src="./images/modal_button_close.png" />
         </button>
@@ -272,7 +282,7 @@ function MovieDetail({ poster_path, title, vote_average, release_date, genres, o
               내 별점
             </p>
             <div class="my-rating-container">
-              ${myRating}
+              ${myRatingtemplate}
             </div>
             <hr class="line"/>
             <p class="label-text">줄거리</p>
@@ -281,37 +291,37 @@ function MovieDetail({ poster_path, title, vote_average, release_date, genres, o
             </p>
           </div>
         </div>`;
+  return { modalDetailtemplate, starEvent };
 }
 const state = {
   searchKeyword: null
 };
 async function fetchPopularMovies(pageIndex) {
   const popularMovieUrl = `${"https://api.themoviedb.org/3/"}movie/popular?language=ko-Kr&page=${pageIndex}`;
-  return await fetchUtil(popularMovieUrl);
+  return await fetchUtil(popularMovieUrl, "GET");
 }
 async function fetchSearchMovies(pageIndex) {
   const searchMovieUrl = `${"https://api.themoviedb.org/3/"}search/movie?query=${state.searchKeyword}&include_adult=false&language=en-US&page=${pageIndex}`;
-  return await fetchUtil(searchMovieUrl);
+  return await fetchUtil(searchMovieUrl, "GET");
 }
 async function fetchDetailMovie(movieId) {
   const detailMovie = `${"https://api.themoviedb.org/3/"}movie/${movieId}?language=ko-Kr`;
-  return await fetchUtil(detailMovie);
+  return await fetchUtil(detailMovie, "GET");
 }
-async function fetchUtil(url) {
+async function fetchUtil(url, method, body) {
   const options = {
+    method,
     headers: {
+      "Content-Type": "application/json",
       Authorization: `Bearer ${"eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1ZTAxM2I1YmViOGE1MjMxNDM0ZDc0OWJlYjM3YzU2NiIsIm5iZiI6MTc0MjI3MTc4My45NjgsInN1YiI6IjY3ZDhmNTI3ZTFlM2NkY2JmOWM2YTA5ZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Gw36ZrbKKajI3n99z42jbhM_RL4wC6_p9UGhmkLgUew"}`
-    }
+    },
+    body: void 0
   };
   try {
     const response = await fetch(url, options);
     const data = await response.json();
     if (!response.ok) {
-      if (response.status === 404) {
-        alert("페이지를 찾을 수 없습니다.");
-      } else if (response.status === 500) {
-        alert("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-      }
+      handleErrorResponse(response.status);
       throw new Error(data.message || "An error occurred");
     }
     return data;
@@ -319,6 +329,36 @@ async function fetchUtil(url) {
     throw error;
   }
 }
+function handleErrorResponse(status) {
+  if (status === 404) {
+    alert("페이지를 찾을 수 없습니다.");
+  } else if (status === 500) {
+    alert("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+  }
+}
+const Spinner = (scale) => {
+  return `
+    <div class="orbit-spinner" style="scale: ${scale}">
+        <div class="planet"></div>
+        <div class="orbit">
+          <div class="satellite satellite-1"></div>
+          <div class="satellite satellite-2"></div>
+        </div>
+      </div>
+    `;
+};
+function InfiniteScrollLoader() {
+  const $el = document.querySelector(".infinite-scroll-loader");
+  $el.innerHTML = Spinner();
+}
+InfiniteScrollLoader.render = function() {
+  const $el = document.querySelector(".infinite-scroll-loader");
+  $el.classList.add("active");
+};
+InfiniteScrollLoader.hide = function() {
+  const $el = document.querySelector(".infinite-scroll-loader");
+  $el.classList.remove("active");
+};
 class MovieLayout {
   constructor(movieData) {
     __privateAdd(this, _state);
@@ -368,7 +408,8 @@ class MovieLayout {
     movieListEl.addEventListener("click", async (event) => {
       const clickedItem = event.target.closest("li");
       const { poster_path, title, vote_average, release_date, genres, overview } = await fetchDetailMovie(clickedItem.id);
-      Modal(`${clickedItem.id}modal`, MovieDetail({ poster_path, title, vote_average, release_date, genres, overview }));
+      const { modalDetailtemplate, starEvent } = MovieDetail({ poster_path, title, vote_average, release_date, genres, overview });
+      Modal(`${clickedItem.id}modal`, modalDetailtemplate, starEvent, title);
       Modal.open(`${clickedItem.id}modal`);
     });
   }
@@ -382,10 +423,13 @@ class MovieLayout {
         movieListEl.addEventListener("click", async (event) => {
           const clickedItem = event.target.closest("li");
           const { poster_path, title, vote_average, release_date, genres, overview } = await fetchDetailMovie(clickedItem.id);
-          Modal(`${clickedItem.id}modal`, MovieDetail({ poster_path, title, vote_average, release_date, genres, overview }));
+          const { modalDetailtemplate, starEvent } = MovieDetail({ poster_path, title, vote_average, release_date, genres, overview });
+          Modal(`${clickedItem.id}modal`, modalDetailtemplate, starEvent, title);
           Modal.open(`${clickedItem.id}modal`);
         });
       });
+    } else {
+      InfiniteScrollLoader.hide();
     }
   }
 }
@@ -441,8 +485,9 @@ async function Banner(data) {
     `;
   const detailButton = document.getElementById("자세히 보기");
   detailButton.addEventListener("click", () => {
-    Modal(`${data.id}modal`, MovieDetail({ poster_path, title, vote_average, release_date, genres, overview }));
-    Modal.open(`${data.id}modal`, MovieDetail({ poster_path, title, vote_average, release_date, genres, overview }));
+    const { modalDetailtemplate, starEvent } = MovieDetail({ poster_path, title, vote_average, release_date, genres, overview });
+    Modal(`${data.id}modal`, modalDetailtemplate, starEvent, title);
+    Modal.open(`${data.id}modal`);
   });
 }
 const intersectionObserver = (movieLayout) => {
@@ -468,8 +513,9 @@ const intersectionObserver = (movieLayout) => {
   });
   observer.observe($target);
 };
-const readMoreMovieList = /* @__PURE__ */ function() {
-  let pageIndex = 2;
+const readMoreMovieList = function() {
+  InfiniteScrollLoader.render();
+  let pageIndex = 1;
   async function loadMovieData() {
     const { results, total_pages } = await fetchPopularMovies(pageIndex);
     pageIndex++;
@@ -481,8 +527,9 @@ const readMoreMovieList = /* @__PURE__ */ function() {
     hideskeleton();
   };
 }();
-const readMoreSearchList = /* @__PURE__ */ function() {
-  let pageIndex = 2;
+const readMoreSearchList = function() {
+  InfiniteScrollLoader.render();
+  let pageIndex = 1;
   async function loadMovieData() {
     const { results, total_pages } = await fetchSearchMovies(pageIndex);
     pageIndex++;
@@ -495,6 +542,9 @@ const readMoreSearchList = /* @__PURE__ */ function() {
   };
 }();
 addEventListener("load", async () => {
+  if ("scrollRestoration" in history) {
+    history.scrollRestoration = "manual";
+  }
   MovieLayout.skeletonRender();
   const movieData = await fetchPopularMovies(1);
   const movieLayout = new MovieLayout(movieData.results);
@@ -502,4 +552,5 @@ addEventListener("load", async () => {
   await submitEvent(movieLayout);
   Header();
   intersectionObserver(movieLayout);
+  InfiniteScrollLoader();
 });
